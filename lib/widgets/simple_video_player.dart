@@ -91,9 +91,16 @@ class _SimpleVideoPlayerState extends State<SimpleVideoPlayer> {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                GestureDetector(
-                  onTap: togglePlay,
-                  child: VideoPlayer(_controller),
+                // Stack gives non-positioned children loose constraints, so
+                // VideoPlayer (which has no intrinsic size of its own) would
+                // otherwise collapse to zero size — invisible-but-rendered
+                // via the platform view's own compositing, yet with no area
+                // left for GestureDetector to actually hit-test taps against.
+                Positioned.fill(
+                  child: GestureDetector(
+                    onTap: togglePlay,
+                    child: VideoPlayer(_controller),
+                  ),
                 ),
                 IgnorePointer(
                   ignoring: true,
