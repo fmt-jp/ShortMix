@@ -32,6 +32,18 @@ class ProcessingProgressView extends StatelessWidget {
     }
   }
 
+  /// Once the encoder reports 100%, ffmpeg can still be busy for a while
+  /// finalizing the file (muxing/`-movflags +faststart` rewrites it to move
+  /// the index to the front) without emitting any further progress ticks.
+  /// A progress bar frozen at "100%" for that whole stretch reads as stuck,
+  /// so once we're this close we switch to an indeterminate (animated) bar
+  /// and stop printing a percentage that isn't moving anyway.
+  bool get _isFinishingUp =>
+      progress.fraction >= 0.99 &&
+      progress.stage != ProcessingStage.completed &&
+      progress.stage != ProcessingStage.failed &&
+      progress.stage != ProcessingStage.cancelled;
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -43,9 +55,11 @@ class ProcessingProgressView extends StatelessWidget {
           const SizedBox(height: 16),
           Text('動画を処理しています', style: Theme.of(context).textTheme.bodyLarge),
           const SizedBox(height: 12),
-          LinearProgressIndicator(value: progress.fraction.clamp(0, 1)),
+          LinearProgressIndicator(
+            value: _isFinishingUp ? null : progress.fraction.clamp(0, 1),
+          ),
           const SizedBox(height: 8),
-          Text('${(progress.fraction * 100).round()}%'),
+          if (!_isFinishingUp) Text('${(progress.fraction * 100).round()}%'),
           const SizedBox(height: 8),
           Text(progress.message ?? _stageLabel),
           if (onCancel != null) ...[

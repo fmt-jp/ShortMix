@@ -122,8 +122,24 @@ class WebVideoProcessingService implements VideoProcessingService {
       );
     }
 
+    // ffmpeg's own progress events track encode position, not the muxer's
+    // final flush (in particular `-movflags +faststart` rewrites the whole
+    // file to move its index to the front) — exec() can keep running well
+    // after the last progress tick, so without these the UI would sit at
+    // "100%" looking frozen for that entire stretch (spec section 29 wants
+    // the user to see *something* moving, not just a percentage).
+    _progressController.add(const ProcessingProgress(
+      stage: ProcessingStage.encoding,
+      fraction: 1,
+      message: 'ファイルを書き出しています...',
+    ));
     final output = await _ffmpeg.readFile(outputName);
 
+    _progressController.add(const ProcessingProgress(
+      stage: ProcessingStage.encoding,
+      fraction: 1,
+      message: '後片付けをしています...',
+    ));
     for (final name in inputNames) {
       await _ffmpeg.deleteFile(name);
     }

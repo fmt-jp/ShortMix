@@ -47,17 +47,35 @@ class _SimpleVideoPlayerState extends State<SimpleVideoPlayer> {
     final position = value.position;
     final duration = value.duration;
 
+    void togglePlay() =>
+        setState(() => value.isPlaying ? _controller.pause() : _controller.play());
+
     return Column(
       children: [
         AspectRatio(
           aspectRatio: 9 / 16,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: GestureDetector(
-              onTap: () => setState(() {
-                value.isPlaying ? _controller.pause() : _controller.play();
-              }),
-              child: VideoPlayer(_controller),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                GestureDetector(
+                  onTap: togglePlay,
+                  child: VideoPlayer(_controller),
+                ),
+                IgnorePointer(
+                  ignoring: true,
+                  child: AnimatedOpacity(
+                    opacity: value.isPlaying ? 0 : 1,
+                    duration: const Duration(milliseconds: 150),
+                    child: const Icon(
+                      Icons.play_circle_fill,
+                      size: 72,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -68,19 +86,9 @@ class _SimpleVideoPlayerState extends State<SimpleVideoPlayer> {
           max: duration.inMilliseconds.toDouble().clamp(1, double.infinity),
           onChanged: (v) => _controller.seekTo(Duration(milliseconds: v.round())),
         ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            IconButton(
-              icon: Icon(value.isPlaying ? Icons.pause : Icons.play_arrow),
-              onPressed: () =>
-                  value.isPlaying ? _controller.pause() : _controller.play(),
-            ),
-            Text(
-              '${formatDuration(position.inMilliseconds / 1000)} / '
-              '${formatDuration(duration.inMilliseconds / 1000)}',
-            ),
-          ],
+        Text(
+          '${formatDuration(position.inMilliseconds / 1000)} / '
+          '${formatDuration(duration.inMilliseconds / 1000)}',
         ),
       ],
     );
