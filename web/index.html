@@ -42,8 +42,11 @@
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
   <script src="flutter_bootstrap.js" async></script>
-  <!-- ffmpeg.wasm bridge (self-hosted, see web/ffmpeg/ and README) used by
-       WebVideoProcessingService for all video encoding (spec sections 7/34). -->
+  <!-- Preferred: WebCodecs-based rendering (hardware-accelerated encode via
+       mediabunny — see web/mediabunny/ and README). -->
+  <script type="module" src="mediabunny_bridge.js"></script>
+  <!-- Fallback for browsers without WebCodecs support (self-hosted, see
+       web/ffmpeg/ and README): software encoding via ffmpeg.wasm. -->
   <script type="module" src="ffmpeg_bridge.js"></script>
 </body>
 </html>

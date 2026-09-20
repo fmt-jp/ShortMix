@@ -6,16 +6,24 @@ import 'package:http/http.dart' as http;
 import 'package:web/web.dart' as web;
 
 import '../../../models/project.dart';
+import '../../../models/transition.dart';
 import '../processing_progress.dart';
 import '../video_info.dart';
 import '../video_processing_service.dart';
 import '../video_source.dart';
 import 'ffmpeg_command_builder.dart';
 import 'ffmpeg_interop.dart';
+import 'mediabunny_interop.dart';
 
-/// Web implementation, backed by ffmpeg.wasm (`@ffmpeg/ffmpeg@0.12.15` /
-/// `@ffmpeg/core@0.12.10`, self-hosted under `web/ffmpeg/` — see README)
-/// running inside its own Web Worker (spec sections 7/33/34).
+/// Web implementation. Rendering prefers the WebCodecs-based path
+/// ([MediabunnyClient], self-hosted under `web/mediabunny/`), which uses
+/// hardware-accelerated decode/encode and is dramatically faster than
+/// software encoding — but WebCodecs isn't available everywhere, and even
+/// where it is, mediabunny is young enough that something can still go
+/// wrong on a given file. Either way this falls back to ffmpeg.wasm
+/// (`@ffmpeg/ffmpeg@0.12.15` / `@ffmpeg/core@0.12.10`, self-hosted under
+/// `web/ffmpeg/`), which is slower but has no such prerequisites and is
+/// the one path proven to work everywhere (spec sections 7/33/34).
 VideoProcessingService createVideoProcessingService() =>
     WebVideoProcessingService();
 
@@ -28,9 +36,17 @@ class WebVideoProcessingService implements VideoProcessingService {
         message: 'エンコードしています',
       ));
     });
+    _mediabunny.onProgress((fraction) {
+      _progressController.add(ProcessingProgress(
+        stage: ProcessingStage.encoding,
+        fraction: fraction.clamp(0, 1),
+        message: 'エンコードしています',
+      ));
+    });
   }
 
   final _ffmpeg = FfmpegClient();
+  final _mediabunny = MediabunnyClient();
   final _progressController = StreamController<ProcessingProgress>.broadcast();
   bool _cancelled = false;
 
@@ -71,6 +87,7 @@ class WebVideoProcessingService implements VideoProcessingService {
   Future<void> cancel() async {
     _cancelled = true;
     _ffmpeg.terminate();
+    _mediabunny.cancel();
     _progressController.add(const ProcessingProgress(
       stage: ProcessingStage.cancelled,
       fraction: 0,
@@ -85,6 +102,47 @@ class WebVideoProcessingService implements VideoProcessingService {
       message: '動画を処理しています',
     ));
 
+    if (await _mediabunny.isSupported()) {
+      try {
+        return await _renderWithMediabunny(project);
+      } catch (_) {
+        _checkCancelled();
+        // Fall through to the ffmpeg.wasm path below — mediabunny is a
+        // young library and WebCodecs support/behavior varies enough by
+        // browser that any failure here should degrade, not hard-fail.
+      }
+    }
+    return _renderWithFfmpeg(project);
+  }
+
+  Future<Uint8List> _renderWithMediabunny(ShortMixProject project) async {
+    final transition = project.transitions.isNotEmpty ? project.transitions.first : const Transition();
+    final clips = project.clips
+        .map((c) => MediabunnyClip(
+              url: c.path,
+              startTime: c.startTime,
+              outputDuration: c.outputDuration,
+            ))
+        .toList();
+
+    final output = await _mediabunny.render(
+      clips: clips,
+      transitionType: transition.type.name,
+      transitionDuration: transition.duration,
+      outputWidth: project.outputWidth,
+      outputHeight: project.outputHeight,
+      fps: 30,
+    );
+    _checkCancelled();
+
+    _progressController.add(const ProcessingProgress(
+      stage: ProcessingStage.completed,
+      fraction: 1,
+    ));
+    return output;
+  }
+
+  Future<Uint8List> _renderWithFfmpeg(ShortMixProject project) async {
     await _ffmpeg.load();
     _checkCancelled();
 
