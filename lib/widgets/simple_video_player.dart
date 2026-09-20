@@ -91,26 +91,28 @@ class _SimpleVideoPlayerState extends State<SimpleVideoPlayer> {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Stack gives non-positioned children loose constraints, so
-                // VideoPlayer (which has no intrinsic size of its own) would
-                // otherwise collapse to zero size — invisible-but-rendered
-                // via the platform view's own compositing, yet with no area
-                // left for GestureDetector to actually hit-test taps against.
+                // On Web, VideoPlayer is backed by a real DOM <video>
+                // element (a platform view) composited on top of Flutter's
+                // canvas. Pointer events landing on that element's own DOM
+                // node don't reach Flutter's gesture system, so a
+                // GestureDetector wrapped directly around it never fires.
+                // Instead, a plain (non-platform-view) transparent layer is
+                // stacked *above* the video to actually catch taps.
+                Positioned.fill(child: VideoPlayer(_controller)),
                 Positioned.fill(
                   child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
                     onTap: togglePlay,
-                    child: VideoPlayer(_controller),
-                  ),
-                ),
-                IgnorePointer(
-                  ignoring: true,
-                  child: AnimatedOpacity(
-                    opacity: value.isPlaying ? 0 : 1,
-                    duration: const Duration(milliseconds: 150),
-                    child: const Icon(
-                      Icons.play_circle_fill,
-                      size: 72,
-                      color: Colors.white70,
+                    child: Center(
+                      child: AnimatedOpacity(
+                        opacity: value.isPlaying ? 0 : 1,
+                        duration: const Duration(milliseconds: 150),
+                        child: const Icon(
+                          Icons.play_circle_fill,
+                          size: 72,
+                          color: Colors.white70,
+                        ),
+                      ),
                     ),
                   ),
                 ),
