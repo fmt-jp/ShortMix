@@ -33,10 +33,13 @@ async function fetchBlob(url) {
  * plain clone() keeps the original (source-relative) timestamp, but each
  * clip's audio needs to land at its own slot in the OUTPUT timeline. */
 function shiftAudioSample(sample, offsetSeconds) {
-  const format = sample.format;
-  const size = sample.allocationSize({ format });
+  // Requesting the interleaved 'f32' layout explicitly (rather than
+  // sample.format, which may be planar) keeps the copyTo output and the
+  // reconstructed AudioSample's declared format in agreement.
+  const format = 'f32';
+  const size = sample.allocationSize({ format, planeIndex: 0 });
   const buffer = new ArrayBuffer(size);
-  sample.copyTo(buffer, { format });
+  sample.copyTo(buffer, { format, planeIndex: 0 });
   return new Mediabunny.AudioSample({
     data: buffer,
     format,
