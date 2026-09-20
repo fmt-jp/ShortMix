@@ -17,6 +17,7 @@ class SimpleVideoPlayer extends StatefulWidget {
 class _SimpleVideoPlayerState extends State<SimpleVideoPlayer> {
   late final VideoPlayerController _controller;
   bool _ready = false;
+  bool _failed = false;
 
   @override
   void initState() {
@@ -24,6 +25,11 @@ class _SimpleVideoPlayerState extends State<SimpleVideoPlayer> {
     _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
       ..initialize().then((_) {
         if (mounted) setState(() => _ready = true);
+      }).catchError((_) {
+        // The file itself is already saved/downloaded by this point (spec
+        // section 27) — a playback failure here (e.g. a browser without
+        // H.264 support) shouldn't block that, just the in-app preview.
+        if (mounted) setState(() => _failed = true);
       })
       ..addListener(() => mounted ? setState(() {}) : null);
   }
@@ -36,6 +42,32 @@ class _SimpleVideoPlayerState extends State<SimpleVideoPlayer> {
 
   @override
   Widget build(BuildContext context) {
+    if (_failed) {
+      return AspectRatio(
+        aspectRatio: 9 / 16,
+        child: ColoredBox(
+          color: Colors.black12,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.movie_outlined, size: 40),
+                  const SizedBox(height: 8),
+                  Text(
+                    'このブラウザではプレビューを再生できませんが、\nファイルは保存済みです。',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     if (!_ready) {
       return const AspectRatio(
         aspectRatio: 9 / 16,
