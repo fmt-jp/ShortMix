@@ -41,6 +41,13 @@ dependencies:
   video_player: ^2.14.0
   # OS-level share sheet (Web Share API / iOS / Android).
   share_plus: ^13.3.0
+  # Fetches picked-video bytes (blob: URLs) to hand to ffmpeg.wasm on Web.
+  http: ^1.6.0
+  # XFile, used to hand exported video bytes to share_plus.
+  cross_file: ^0.3.5+5
+  # Typed dom bindings (Blob/URL) used to turn ffmpeg.wasm's output into a
+  # downloadable/previewable object URL on Web.
+  web: ^1.1.1
 
 dev_dependencies:
   flutter_test:
